@@ -1,0 +1,398 @@
+{
+  "name": "Sales brief",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "Company research",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Company name",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Additional research requirements",
+              "fieldType": "textarea",
+              "placeholder": "What else do you want to know?"
+            },
+            {
+              "fieldLabel": "Report format",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Google Doc"
+                  },
+                  {
+                    "option": "Downloadable PDF"
+                  }
+                ]
+              },
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        192,
+        -848
+      ],
+      "id": "0aa7df67-5c78-415b-8065-545c55667f08",
+      "name": "Input form",
+      "webhookId": "5f572a7a-fe3c-4a3c-869e-5aabad468d94",
+      "notesInFlow": true,
+      "notes": "The way to get sample input into the flow in development"
+    },
+    {
+      "parameters": {
+        "jsCode": "const company = $json.company; // from Apollo mapper step\nconst company_name = company?.name || $('Input form').first().json['Company name']\nconst extra = $('Input form').first().json['Additional research requirements']\n// Helper for a clean domain hyperlink if domain is missing but website exists\nconst canonicalDomain =\n  company?.domain ||\n  (company?.website || '')\n    .replace(/^https?:\\/\\//, '')\n    .replace(/^www\\./, '')\n    .split('/')[0] ||\n  'Unknown';\n\n// Build the instruction prompt\nlet prompt = `\nYou are preparing an UpGuard sales prep brief. Use the JSON facts under <apollo_facts> as your primary source.\nIf you add anything beyond Apollo, include it only if you are highly confident; otherwise write \"Unknown\".\nPrefer British English and keep it concise. Output strictly in Markdown.\n\n<apollo_facts>\n${JSON.stringify(company, null, 2)}\n</apollo_facts>\n\nStart with a compact, visual **Company at a glance** card using the Apollo fields. \nFollow this exact Markdown structure:\n\n# UpGuard sales prep brief: ${company_name}\n\n## Company at a glance\n${company?.logo ? `![Company logo](${company.logo})\\n` : ''}\n**Website:** [${canonicalDomain}](${canonicalDomain === 'Unknown' ? '#' : `https://${canonicalDomain}`})  \n**Industry:** {{industry or \"Unknown\"}}  \n**Employees:** {{employees or \"Unknown\"}}  \n**Revenue:** {{annual_revenue_printed or \"Unknown\"}}  \n**HQ:** {{hq.city}}, {{hq.country}}  \n**Founded:** {{founded_year or \"Unknown\"}}\n\nThen continue with the sections below.\n\n## Qualification intel\n- Size & revenue: Use employees and annual_revenue(_printed). Mention market cap/ticker if present.\n- Likely compliance scope: Infer (e.g. SOX, HIPAA, PCI DSS, GDPR) from industry and HQ.\n- Vendor ecosystem complexity: Infer from tech_stack size and enterprise signals (public, market cap, global HQ).\n\n## Pain indicators\n- Recent security incidents or peer breaches: Only include if well-known; otherwise \"Unknown\".\n- Regulatory or growth pressures that expand third-party risk.\n- Hiring or leadership changes in security: Only if confident; else \"Unknown\".\n\n## Competitive landscape\n- Likely existing security/IT tools from tech_stack (e.g. Salesforce, AWS, OneTrust, Marketo).\n- Gaps UpGuard can address (third-party risk, vendor monitoring, attack surface, questionnaire fatigue).\n- Typical alternatives a company like this might consider.\n\n## Key talking points\n- Industry-specific risk examples and peer references.\n- Concise value props tailored to their stack and scale.\n- 1–2 proof points you can deliver quickly (e.g. vendor monitoring, risk ratings, evidence collection).\n\n## Technical fit\n- Integrations suggested by tech_stack (CRMs, ticketing, cloud, marketing tools).\n- Scale considerations (employee count, web traffic/alexa_rank, geography).\n- Data flows likely relevant to due diligence and continuous monitoring.\n\nConstraints:\n- Keep each section to 2–3 bullets. \n- Use short, high-signal sentences.\n- Do not fabricate specifics; say \"Unknown\" if unsure.\n`;\n\nif (extra && extra.trim()) {\n  prompt += `\n\n## Additional research focus\n${extra}\n`;\n}\n\nreturn { json: { company_research_prompt: prompt, company_name: company_name } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1216,
+        -848
+      ],
+      "id": "9a3b54c9-80a4-4ab6-9ae7-c1ec0c248bcc",
+      "name": "Company research prompt",
+      "notesInFlow": true,
+      "notes": "Modify this to create the research brief"
+    },
+    {
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "redirect",
+        "redirectUrl": "={{$('Input form').item.json['Report format'].toLowerCase().includes('pdf')\n  ? `https://docs.google.com/document/d/${$json.id}/export?format=pdf`\n  : `https://docs.google.com/document/d/${$json.id}/edit`}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 1,
+      "position": [
+        2464,
+        -848
+      ],
+      "id": "12f5c900-2f9e-460c-af73-f41be349a4ad",
+      "name": "Form response",
+      "webhookId": "7a385fc1-9f7f-4abd-a3a0-08f31865f561"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $('Company research prompt').item.json.company_research_prompt }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        -848
+      ],
+      "id": "a181f36b-0717-4e81-acaa-2127eae91868",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VcD4xX33fipZ3gMe",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "markdownToHtml",
+        "markdown": "={{ $json.content.parts[0].text }}",
+        "destinationKey": "html",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.markdown",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        -848
+      ],
+      "id": "a0714223-0cdd-4c7b-92f5-ec9dfa755e60",
+      "name": "Markdown to HTML"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "e0c19a38-ba5e-4f4f-bea7-4b264b568186",
+              "name": "Google Drive folder",
+              "value": "18hVRs9HvH0J_tdRBiBQxa1shrxVzYHoR",
+              "type": "string"
+            },
+            {
+              "id": "078dd0ea-bb31-4ffe-ab9a-41e15f8eb728",
+              "name": "File name",
+              "value": "=Sales call brief - {{ $('Input form').item.json['Company name'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2016,
+        -848
+      ],
+      "id": "9a5706ac-f0b7-4492-aa15-4102e1bc1561",
+      "name": "Destination preferences",
+      "notesInFlow": true,
+      "notes": "Define file location and name"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleDriveOAuth2Api",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "multipart/related; boundary=foo_bar_baz",
+        "body": "=--foo_bar_baz\nContent-Type: application/json; charset=UTF-8\n\n{\n  \"name\": \"{{ $json['File name'] }}\",\n  \"mimeType\": \"application/vnd.google-apps.document\",\n  \"parents\": [\"{{ $json['Google Drive folder'] }}\"]\n}\n--foo_bar_baz\nContent-Type: text/html; charset=UTF-8\n\n{{ $('Markdown to HTML').item.json.html }}\n--foo_bar_baz--",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2240,
+        -848
+      ],
+      "id": "dd44945d-1c53-4e2b-808a-c233a49d321c",
+      "name": "Create Google Doc",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "dthBuP4ZRISjgaKW",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=Return the primary domain for company \"{{ $json['Company name'] }}\". Return only the domain name with nothing else."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -848
+      ],
+      "id": "aed27e6b-da83-4a51-8d6a-04724df3892c",
+      "name": "Get domain name",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "VcD4xX33fipZ3gMe",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const org = $json.organization || {};\nconst techs = (org.technology_names || []).slice(0, 15); // keep it short\n\nreturn [{\n  json: {\n    company: {\n      name: org.name,\n      domain: org.primary_domain,\n      website: org.website_url,\n      linkedin: org.linkedin_url,\n      logo: org.logo_url,\n      founded_year: org.founded_year,\n      industry: (org.industries && org.industries[0]) || org.industry || null,\n      employees: org.estimated_num_employees,\n      annual_revenue: org.annual_revenue,             // number\n      annual_revenue_printed: org.annual_revenue_printed, // human-readable\n      market_cap: org.market_cap,\n      ticker: org.publicly_traded_symbol,\n      exchange: org.publicly_traded_exchange,\n      hq: {\n        city: org.city,\n        state: org.state,\n        country: org.country,\n      },\n      tech_stack: techs,\n      keywords: (org.keywords || []).slice(0, 20),\n      alexa_rank: org.alexa_ranking\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        992,
+        -848
+      ],
+      "id": "49dc973b-276c-4724-862a-70bf50104d50",
+      "name": "Summarise Apollo enrichment"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.apollo.io/api/v1/organizations/enrich",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "domain",
+              "value": "={{ $json.content.parts[0].text }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"q_keywords\": \"Asana Inc\",\n  \"page\": 1,\n  \"per_page\": 1\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        768,
+        -848
+      ],
+      "id": "eb82feb6-3428-47bd-8a81-24aee3fa2aef",
+      "name": "Request Apollo company enrichment",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "sS9tPPd6lqEK1maq",
+          "name": "Apollo.ai"
+        }
+      },
+      "notes": "Call Apollo.ai for company enrichment data"
+    },
+    {
+      "parameters": {
+        "content": "## Getting started\nBefore you can use this file you will need to:\n* Add your Gemini API key\n* Add your Google Drive credentials\n* Add Apollo.ai API key (available on free tier)\n* Review and adjust the prompt in \"Company Research Prompt\" as needed\n* Add Drive folder ID into \"Destination preferences\"",
+        "height": 224,
+        "width": 416
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        512,
+        -1120
+      ],
+      "typeVersion": 1,
+      "id": "ad723e57-19f8-4220-9b32-ca320c3e59bc",
+      "name": "Sticky Note1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Input form": {
+      "main": [
+        [
+          {
+            "node": "Get domain name",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Company research prompt": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Markdown to HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Markdown to HTML": {
+      "main": [
+        [
+          {
+            "node": "Destination preferences",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Destination preferences": {
+      "main": [
+        [
+          {
+            "node": "Create Google Doc",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Google Doc": {
+      "main": [
+        [
+          {
+            "node": "Form response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get domain name": {
+      "main": [
+        [
+          {
+            "node": "Request Apollo company enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Apollo company enrichment": {
+      "main": [
+        [
+          {
+            "node": "Summarise Apollo enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarise Apollo enrichment": {
+      "main": [
+        [
+          {
+            "node": "Company research prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "29387466-8980-4838-8317-eb8a41468f7a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "84613d6d40523e6ebbcb3a36ae255e5e60016439f06393a2556f42098b4db001"
+  },
+  "id": "5iW9HGqYBPo0zGTd",
+  "tags": []
+}
