@@ -4,11 +4,11 @@
 
 ## Setup instructions
 
-* Add your Gemini API key.
-* Add your Google Drive credentials.
-* Add your Apollo.io API key (available on the free tier).
+* Add your Gemini API key. You can generate one from the [Google AI Studio API Keys page](https://aistudio.google.com/app/apikey).
+* Add your Google Drive credentials. Set up OAuth credentials in the [Google Cloud Console](https://console.cloud.google.com/apis/credentials) (see [Google's guide](https://developers.google.com/drive/api/quickstart/nodejs) for details).
+* Add your Apollo.io API key (available on the free tier). Generate your key from the [Apollo.io API settings page](https://apollo.io/settings/api), then add in as a generic Header Auth in n8n with `x-api-key` as the name.
 * Review and adjust the prompt in "Company Research Prompt" as needed.
-* Add the Drive folder ID into "Destination preferences".
+* Add the Drive folder ID into "Destination preferences" (find the folder ID in the URL when viewing your folder in Google Drive).
 
 ## The approach
 
@@ -29,6 +29,7 @@
 
 ## How I would improve it if I had more time
 
+* Make the flow more accessible to less technical users, if customisation is required by sales team directly. This might involve making a Loom walkthrough, or having ome place where configuration takes place.
 * Consider integrating more research inputs (for example, Clearbit and BuiltWith) and incorporating them into the report, depending on the needs of the sales team.
 * Consider the ideal workflow trigger and where the data should ultimately appear. As above, I think this would most likely be triggered by a sales pipeline stage changing, and the data would be added directly to the deal record inside the sales tool (e.g., HubSpot) to ensure the data is where the sales agents need it.
 * Consider the pros and cons of using tool calls vs. a standalone node to generate the sales prep brief.
